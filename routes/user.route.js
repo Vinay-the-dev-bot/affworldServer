@@ -93,11 +93,9 @@ userRouter.post("/google-login", async (req, res) => {
       console.log("ERRR", error);
     }
 
-    // Step 3: Check if the user exists in the database
     let user = await UserModel.findOne({ googleId: sub });
 
     if (!user) {
-      // If user doesn't exist, create a new user
       user = new UserModel({
         googleId: sub,
         name,
