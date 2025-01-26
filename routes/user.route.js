@@ -51,119 +51,6 @@ userRouter.post("/login", upload.none(), async (req, res) => {
   }
 });
 
-let otpStore = {};
-
-const googleTokenUrl = "https://oauth2.googleapis.com/token";
-
-userRouter.post("/google-login", async (req, res) => {
-  const { code } = req.body;
-
-  if (!code) {
-    return res
-      .status(400)
-      .json({ status: false, msg: "Authorization code is required" });
-  }
-
-  try {
-    const tokenResponse = await axios.post(
-      "https://oauth2.googleapis.com/token",
-      {
-        code,
-        client_id: process.env.GOOGLE_CLIENT_ID,
-        client_secret: process.env.GOOGLE_CLIENT_SECRET,
-        redirect_uri: process.env.GOOGLE_REDIRECT_URI,
-        grant_type: "authorization_code"
-      }
-    );
-
-    const { access_token, id_token } = tokenResponse.data;
-
-    if (!access_token || !id_token) {
-      return res
-        .status(400)
-        .json({ status: false, msg: "Failed to get access token from Google" });
-    }
-    var sub, name, email, picture;
-    try {
-      const userInfoResponse = await axios.get(
-        `https://www.googleapis.com/oauth2/v3/tokeninfo?id_token=${id_token}`
-      );
-      var { sub, name, email, picture } = userInfoResponse.data;
-    } catch (error) {
-      console.log("ERRR", error);
-    }
-
-    let user = await UserModel.findOne({ googleId: sub });
-
-    if (!user) {
-      user = new UserModel({
-        googleId: sub,
-        name,
-        email,
-        profilePicture: picture
-      });
-
-      await user.save();
-    }
-
-    const payload = { userId: user._id, email: user.email };
-    const token = jwt.sign(payload, process.env.loginSecret);
-
-    return res.status(200).json({
-      status: true,
-      msg: "Login successful",
-      token,
-      userData: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        profilePicture: user.profilePicture
-      }
-    });
-  } catch (error) {
-    console.error("Google Login Error:", error);
-    return res
-      .status(500)
-      .json({ status: false, msg: "Internal server error" });
-  }
-});
-
-userRouter.get("/google/callback", async (req, res) => {
-  const { code } = req.query;
-
-  if (!code) {
-    return res.status(400).send("Authorization code not found");
-  }
-
-  try {
-    const response = await axios.post(googleTokenUrl, null, {
-      params: {
-        code,
-        client_id: process.env.GOOGLE_CLIENT_ID,
-        client_secret: process.env.GOOGLE_CLIENT_SECRET,
-        redirect_uri: process.env.REDIRECT_URI,
-        grant_type: "authorization_code"
-      }
-    });
-
-    const accessToken = response.data.access_token;
-
-    const userInfo = await axios.get(
-      "https://www.googleapis.com/oauth2/v3/userinfo",
-      {
-        headers: {
-          Authorization: `Bearer ${accessToken}`
-        }
-      }
-    );
-
-    res.json(userInfo.data);
-  } catch (error) {
-    console.error("Error exchanging authorization code:", error);
-    res.status(500).send("An error occurred");
-  }
-});
-
 userRouter.post("/reset-password", async (req, res) => {
   const { email, newPassword } = req.body;
 
@@ -190,9 +77,7 @@ userRouter.post("/reset-password", async (req, res) => {
 
 userRouter.get("/send-otp", async (req, res) => {
   const { email } = req.query;
-  const decodedEmail = decodeURIComponent(email); // Decoding the URL-encoded email
-  console.log("Decoded email:", decodedEmail);
-  console.log("EMAIL", decodedEmail);
+  const decodedEmail = decodeURIComponent(email);
   try {
     const user = await UserModel.findOne({ email: decodedEmail });
     if (!user) {
@@ -239,15 +124,6 @@ userRouter.post("/register", upload.none(), async (req, res) => {
     });
   } catch (error) {
     res.send({ msg: `${error}` });
-  }
-});
-
-userRouter.get("/feed", async (req, res) => {
-  try {
-    const { email } = req.body;
-    res.status(200).send({ message: "New post added successfully.", email });
-  } catch (err) {
-    res.status(400).send({ message: "Bad Request." });
   }
 });
 
