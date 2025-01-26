@@ -89,4 +89,27 @@ tasksRouter.get("/", auth, async (req, res) => {
   }
 });
 
+tasksRouter.patch("/:id", auth, async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+  try {
+    const task = await TasksModel.findOneAndUpdate({ _id: id }, { status });
+
+    if (!task) {
+      return res.status(404).json({ message: "Task not found" });
+    }
+
+    res.status(200).json({
+      message: "Task updated successfully",
+      task: task,
+      status: true
+    });
+  } catch (error) {
+    console.error("Error updating task:", error);
+    res
+      .status(500)
+      .json({ message: "Server error", error: error.message, status: false });
+  }
+});
+
 module.exports = { tasksRouter };
